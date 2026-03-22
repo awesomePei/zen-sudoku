@@ -14,7 +14,7 @@ const app = new Hono<{ Bindings: Env; Variables: Variables }>();
 
 // Enable CORS
 app.use('*', cors({
-  origin: ['https://zen-sudoku.pages.dev', 'https://zen-sudoku-y91.pages.dev/', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
+  origin: ['https://zen-sudoku.pages.dev', 'https://zen-sudoku-y91.pages.dev', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
   credentials: true,
 }));
 
