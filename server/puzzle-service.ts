@@ -1,5 +1,4 @@
 import { v4 as uuidv4 } from 'uuid';
-import { savePuzzle } from './db';
 
 export type Difficulty = 'Easy' | 'Medium' | 'Hard' | 'Expert';
 export type Board = (number | null)[][];
@@ -152,9 +151,6 @@ export function generatePuzzle(difficulty: Difficulty): {
   
   // Generate unique puzzle ID
   const puzzleId = uuidv4();
-  
-  // Save to database for later validation
-  savePuzzle(puzzleId, difficulty, fullBoard, solution);
   
   return {
     puzzle,

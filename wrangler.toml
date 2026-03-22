@@ -1,0 +1,26 @@
+name = "zen-sudoku-api"
+main = "server/worker.ts"
+compatibility_date = "2024-12-16"
+compatibility_flags = ["nodejs_compat"]
+
+[env.production]
+routes = [
+  { pattern = "api.zen-sudoku.com/*", zone_id = "YOUR_ZONE_ID" }
+]
+
+[[kv_namespaces]]
+binding = "GAMES"
+id = "YOUR_KV_NAMESPACE_ID"
+preview_id = "YOUR_KV_PREVIEW_ID"
+
+[build]
+command = "npm run build"
+cwd = "."
+
+[build.upload]
+format = "service-worker"
+
+[env.preview]
+[[env.preview.kv_namespaces]]
+binding = "GAMES"
+id = "YOUR_KV_PREVIEW_ID"

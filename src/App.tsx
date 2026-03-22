@@ -25,16 +25,36 @@ import LossScreen from './components/LossScreen';
 
 const DIFFICULTIES: Difficulty[] = ['Easy', 'Medium', 'Hard', 'Expert'];
 
-// API helper functions
-const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+// API Response Types
+interface PuzzleResponse {
+  puzzle: Board;
+  solution: Board;
+  puzzleId: string;
+  difficulty: Difficulty;
+}
 
-async function fetchPuzzle(difficulty: Difficulty) {
+interface ValidateResponse {
+  valid: boolean;
+}
+
+interface SubmitResponse {
+  correct: boolean;
+  score: number;
+}
+
+// API helper functions
+// For local Wrangler development: http://localhost:8787
+// For local Express development: http://localhost:3001
+// For production: Set VITE_API_URL environment variable
+const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8787';
+
+async function fetchPuzzle(difficulty: Difficulty): Promise<PuzzleResponse> {
   const response = await fetch(`${apiUrl}/api/puzzle?difficulty=${difficulty}`);
   if (!response.ok) throw new Error('Failed to generate puzzle');
   return response.json();
 }
 
-async function validateMove(row: number, col: number, num: number) {
+async function validateMove(row: number, col: number, num: number): Promise<ValidateResponse> {
   const response = await fetch(`${apiUrl}/api/validate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -44,7 +64,7 @@ async function validateMove(row: number, col: number, num: number) {
   return response.json();
 }
 
-async function submitGame(puzzleId: string, finalBoard: Board, timeSpent: number, sessionId: string, invalidMoveCount: number, hintsUsed: number) {
+async function submitGame(puzzleId: string, finalBoard: Board, timeSpent: number, sessionId: string, invalidMoveCount: number, hintsUsed: number): Promise<SubmitResponse> {
   const response = await fetch(`${apiUrl}/api/submit`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
