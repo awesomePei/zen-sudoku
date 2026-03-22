@@ -46,7 +46,11 @@ interface SubmitResponse {
 // For local Wrangler development: http://localhost:8787
 // For local Express development: http://localhost:3001
 // For production: Set VITE_API_URL environment variable
-const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8787';
+const apiUrl = import.meta.env.VITE_API_URL;
+
+if (!apiUrl && import.meta.env.PROD) {
+  console.warn("WARNING: VITE_API_URL is not defined in production!");
+}
 
 async function fetchPuzzle(difficulty: Difficulty): Promise<PuzzleResponse> {
   const response = await fetch(`${apiUrl}/api/puzzle?difficulty=${difficulty}`);
