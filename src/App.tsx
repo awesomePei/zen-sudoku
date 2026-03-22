@@ -17,18 +17,42 @@ import {
   Timer as TimerIcon
 } from 'lucide-react';
 import { 
-  generateFullBoard, 
-  generatePuzzle, 
   Difficulty, 
-  Board, 
-  isValid,
-  isBoardComplete,
-  isBoardValid
+  Board
 } from './utils/sudoku';
 import InvalidMoveCounter from './components/InvalidMoveCounter';
 import LossScreen from './components/LossScreen';
 
 const DIFFICULTIES: Difficulty[] = ['Easy', 'Medium', 'Hard', 'Expert'];
+
+// API helper functions
+const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+async function fetchPuzzle(difficulty: Difficulty) {
+  const response = await fetch(`${apiUrl}/api/puzzle?difficulty=${difficulty}`);
+  if (!response.ok) throw new Error('Failed to generate puzzle');
+  return response.json();
+}
+
+async function validateMove(row: number, col: number, num: number) {
+  const response = await fetch(`${apiUrl}/api/validate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ row, col, num }),
+  });
+  if (!response.ok) throw new Error('Validation failed');
+  return response.json();
+}
+
+async function submitGame(puzzleId: string, finalBoard: Board, timeSpent: number, sessionId: string, invalidMoveCount: number, hintsUsed: number) {
+  const response = await fetch(`${apiUrl}/api/submit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ puzzleId, finalBoard, timeSpent, sessionId, invalidMoveCount, hintsUsed }),
+  });
+  if (!response.ok) throw new Error('Failed to submit game');
+  return response.json();
+}
 
 export default function App() {
   const [fullBoard, setFullBoard] = useState<Board>([]);
@@ -43,24 +67,60 @@ export default function App() {
   const [hints, setHints] = useState(3);
   const [invalidMoveCount, setInvalidMoveCount] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string>('');
+  const [puzzleId, setPuzzleId] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
 
-  // Initialize game
-  const startNewGame = useCallback((diff: Difficulty) => {
-    const full = generateFullBoard();
-    const puzzle = generatePuzzle(full, diff);
-    setFullBoard(full);
-    setInitialBoard(puzzle);
-    setCurrentBoard(puzzle.map(row => [...row]));
-    setDifficulty(diff);
-    setGameState('playing');
-    setTimer(0);
-    setMistakes(0);
-    setHints(3);
-    setInvalidMoveCount(0);
-    setErrorMessage(null);
-    setSelectedCell(null);
-    setIsPaused(false);
+  // Initialize session ID on component mount
+  useEffect(() => {
+    let id = localStorage.getItem('sudokuSessionId');
+    if (!id) {
+      id = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      localStorage.setItem('sudokuSessionId', id);
+    }
+    setSessionId(id);
   }, []);
+
+  // Initialize game by fetching from server
+  const startNewGame = useCallback(async (diff: Difficulty) => {
+    setIsLoading(true);
+    setErrorMessage(null);
+    try {
+      const puzzle = await fetchPuzzle(diff);
+      setFullBoard(puzzle.solution);
+      setInitialBoard(puzzle.puzzle);
+      setCurrentBoard(puzzle.puzzle.map((row: (number | null)[]) => [...row]));
+      setPuzzleId(puzzle.puzzleId);
+      setDifficulty(diff);
+      setGameState('playing');
+      setTimer(0);
+      setMistakes(0);
+      setHints(3);
+      setInvalidMoveCount(0);
+      setSelectedCell(null);
+      setIsPaused(false);
+    } catch (error) {
+      console.error('Failed to start game:', error);
+      setErrorMessage('Failed to generate puzzle. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Submit game results when won
+  useEffect(() => {
+    if (gameState === 'won' && puzzleId && sessionId) {
+      (async () => {
+        try {
+          const result = await submitGame(puzzleId, currentBoard, timer, sessionId, invalidMoveCount, 3 - hints);
+          console.log('Game submitted:', result);
+        } catch (error) {
+          console.error('Failed to submit game:', error);
+        }
+      })();
+    }
+  }, [gameState, puzzleId, sessionId, currentBoard, timer, invalidMoveCount, hints]);
 
   // Timer logic
   useEffect(() => {
@@ -84,8 +144,8 @@ export default function App() {
     setSelectedCell([row, col]);
   };
 
-  const handleNumberInput = (num: number) => {
-    if (!selectedCell || gameState !== 'playing' || isPaused) return;
+  const handleNumberInput = async (num: number) => {
+    if (!selectedCell || gameState !== 'playing' || isPaused || isValidating) return;
     const [row, col] = selectedCell;
 
     // Don't allow changing initial numbers
@@ -93,48 +153,61 @@ export default function App() {
 
     const newBoard = currentBoard.map(r => [...r]);
     
-    // Check if the move is valid using Sudoku rules
-    const isValidMove = isValid(currentBoard, row, col, num);
-    
-    // If the move violates Sudoku rules, it's an invalid move
-    if (!isValidMove) {
-      // Invalid move - increment counter and provide feedback
-      const newInvalidCount = invalidMoveCount + 1;
-      setInvalidMoveCount(newInvalidCount);
-      setErrorMessage(`Invalid move! Number already exists in this row, column, or box. (${newInvalidCount}/3 strikes)`);
+    setIsValidating(true);
+    try {
+      const validationResult = await validateMove(row, col, num);
       
-      // Clear error message after 3 seconds
+      if (!validationResult.valid) {
+        // Invalid move - increment counter
+        const newInvalidCount = invalidMoveCount + 1;
+        setInvalidMoveCount(newInvalidCount);
+        setErrorMessage(`Invalid move! Number already exists in this row, column, or box. (${newInvalidCount}/3 strikes)`);
+        setTimeout(() => setErrorMessage(null), 3000);
+        
+        if (newInvalidCount >= 3) {
+          setGameState('lost');
+        }
+        return;
+      }
+
+      // Valid placement - check if it's the correct answer
+      if (fullBoard[row][col] === num) {
+        newBoard[row][col] = num;
+        setCurrentBoard(newBoard);
+        setErrorMessage(null);
+        
+        // Check if board is complete
+        let isComplete = true;
+        for (let r = 0; r < 9; r++) {
+          for (let c = 0; c < 9; c++) {
+            if (newBoard[r][c] === null) {
+              isComplete = false;
+              break;
+            }
+          }
+          if (!isComplete) break;
+        }
+        
+        if (isComplete) {
+          setGameState('won');
+        }
+      } else {
+        // Valid structure but wrong number
+        const newInvalidCount = invalidMoveCount + 1;
+        setInvalidMoveCount(newInvalidCount);
+        setErrorMessage(`Incorrect number! Try again. (${newInvalidCount}/3 strikes)`);
+        setTimeout(() => setErrorMessage(null), 3000);
+        
+        if (newInvalidCount >= 3) {
+          setGameState('lost');
+        }
+      }
+    } catch (error) {
+      console.error('Validation error:', error);
+      setErrorMessage('Failed to validate move. Check your connection.');
       setTimeout(() => setErrorMessage(null), 3000);
-      
-      // Check if this is the third invalid move
-      if (newInvalidCount >= 3) {
-        setGameState('lost');
-      }
-      return;
-    }
-    
-    // Valid placement - check if it's the correct answer
-    if (fullBoard[row][col] === num) {
-      newBoard[row][col] = num;
-      setCurrentBoard(newBoard);
-      setErrorMessage(null);
-      
-      if (isBoardComplete(newBoard)) {
-        setGameState('won');
-      }
-    } else {
-      // Valid move structure but wrong number - still invalid attempt
-      const newInvalidCount = invalidMoveCount + 1;
-      setInvalidMoveCount(newInvalidCount);
-      setErrorMessage(`Incorrect number! Try again. (${newInvalidCount}/3 strikes)`);
-      
-      // Clear error message after 3 seconds
-      setTimeout(() => setErrorMessage(null), 3000);
-      
-      // Check if this is the third invalid move
-      if (newInvalidCount >= 3) {
-        setGameState('lost');
-      }
+    } finally {
+      setIsValidating(false);
     }
   };
 
@@ -158,7 +231,19 @@ export default function App() {
     setCurrentBoard(newBoard);
     setHints(prev => prev - 1);
 
-    if (isBoardComplete(newBoard)) {
+    // Check if board is complete after hint
+    let isComplete = true;
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        if (newBoard[r][c] === null) {
+          isComplete = false;
+          break;
+        }
+      }
+      if (!isComplete) break;
+    }
+
+    if (isComplete) {
       setGameState('won');
     }
   };
@@ -222,7 +307,8 @@ export default function App() {
                   <button
                     key={diff}
                     onClick={() => startNewGame(diff)}
-                    className="group relative overflow-hidden bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all text-left"
+                    disabled={isLoading}
+                    className="group relative overflow-hidden bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <div className="relative z-10">
                       <h3 className="text-xl font-bold text-gray-800">{diff}</h3>
@@ -239,6 +325,16 @@ export default function App() {
                   </button>
                 ))}
               </div>
+              {errorMessage && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-700 text-sm font-medium text-center"
+                >
+                  {errorMessage}
+                </motion.div>
+              )}
             </motion.div>
           ) : gameState === 'lost' ? (
             <LossScreen 
@@ -363,7 +459,8 @@ export default function App() {
                   <button
                     key={num}
                     onClick={() => handleNumberInput(num)}
-                    className="aspect-square flex items-center justify-center text-2xl font-medium bg-white rounded-xl shadow-sm border border-gray-100 hover:border-indigo-300 hover:text-indigo-600 transition-all active:scale-95"
+                    disabled={isValidating || gameState !== 'playing'}
+                    className="aspect-square flex items-center justify-center text-2xl font-medium bg-white rounded-xl shadow-sm border border-gray-100 hover:border-indigo-300 hover:text-indigo-600 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {num}
                   </button>

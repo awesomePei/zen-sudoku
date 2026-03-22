@@ -1,9 +1,8 @@
+import { v4 as uuidv4 } from 'uuid';
+import { savePuzzle } from './db';
 
 export type Difficulty = 'Easy' | 'Medium' | 'Hard' | 'Expert';
-
 export type Board = (number | null)[][];
-
-export const BLANK_BOARD: Board = Array(9).fill(null).map(() => Array(9).fill(null));
 
 /** Checks if placing 'num' at board[row][col] is valid. */
 export function isValid(board: Board, row: number, col: number, num: number): boolean {
@@ -83,7 +82,7 @@ function isUnusedInBox(board: Board, rowStart: number, colStart: number, num: nu
 }
 
 /** Creates a puzzle by removing numbers from a full board. */
-export function generatePuzzle(fullBoard: Board, difficulty: Difficulty): Board {
+export function generatePuzzleFromBoard(fullBoard: Board, difficulty: Difficulty): Board {
   const puzzle: Board = fullBoard.map(row => [...row]);
   let attempts = 0;
   
@@ -133,4 +132,34 @@ export function isBoardValid(board: Board): boolean {
     }
   }
   return true;
+}
+
+/** Generate a new puzzle with solution and metadata */
+export function generatePuzzle(difficulty: Difficulty): {
+  puzzle: Board;
+  solution: Board;
+  puzzleId: string;
+  difficulty: Difficulty;
+} {
+  // Generate full board
+  const fullBoard = generateFullBoard();
+  
+  // Create a copy for the solution
+  const solution = fullBoard.map(row => [...row]);
+  
+  // Generate puzzle by removing cells
+  const puzzle = generatePuzzleFromBoard(fullBoard, difficulty);
+  
+  // Generate unique puzzle ID
+  const puzzleId = uuidv4();
+  
+  // Save to database for later validation
+  savePuzzle(puzzleId, difficulty, fullBoard, solution);
+  
+  return {
+    puzzle,
+    solution,
+    puzzleId,
+    difficulty,
+  };
 }
