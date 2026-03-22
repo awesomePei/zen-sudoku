@@ -1,4 +1,4 @@
-name = "zen-sudoku-api"
+name = "zen-sudoku-server"
 main = "server/worker.ts"
 compatibility_date = "2024-12-16"
 compatibility_flags = ["nodejs_compat"]
