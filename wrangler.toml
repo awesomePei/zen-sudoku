@@ -10,8 +10,8 @@ routes = [
 
 [[kv_namespaces]]
 binding = "GAMES"
-id = "YOUR_KV_NAMESPACE_ID"
-preview_id = "YOUR_KV_PREVIEW_ID"
+id = "331e3f4f94f44236ba51e95d23f9df6a"
+preview_id = "754d2c059f6948ab9f8d16366289175d"
 
 [build]
 command = "npm run build"
@@ -23,4 +23,4 @@ format = "service-worker"
 [env.preview]
 [[env.preview.kv_namespaces]]
 binding = "GAMES"
-id = "YOUR_KV_PREVIEW_ID"
+id = "754d2c059f6948ab9f8d16366289175d"
