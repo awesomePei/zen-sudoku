@@ -46,7 +46,7 @@ interface SubmitResponse {
 // For local Wrangler development: http://localhost:8787
 // For local Express development: http://localhost:3001
 // For production: Set VITE_API_URL environment variable
-const apiUrl = import.meta.env.VITE_API_URL;
+const apiUrl = 'https://zen-sudoku-server.momotsai910.workers.dev';
 
 if (!apiUrl && import.meta.env.PROD) {
   console.warn("WARNING: VITE_API_URL is not defined in production!");
