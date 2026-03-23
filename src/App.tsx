@@ -495,11 +495,11 @@ export default function App() {
               </div>
               <h2 className="text-4xl font-bold">Magnificent!</h2>
               <p className="text-gray-500 max-w-xs mx-auto">
-                You solved it in <span className="font-bold text-indigo-600">{formatTime(timer)}</span>!
+                Your final score: <span className="font-bold text-indigo-600">{formatTime(timer)}</span>!
               </p>
               {invalidMoveCount > 0 && (
                 <p className="text-sm text-gray-400">
-                  {invalidMoveCount} penalt{invalidMoveCount === 1 ? 'y' : 'ies'} applied • Final time: {formatTime(timer)}
+                  {invalidMoveCount} penalt{invalidMoveCount === 1 ? 'y' : 'ies'} applied • Actual time: {formatTime(timer - invalidMoveCount * 30)}
                 </p>
               )}
               <div className="flex flex-col gap-3 max-w-xs mx-auto pt-6">
