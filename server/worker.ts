@@ -125,19 +125,10 @@ app.post('/api/submit', async (c) => {
       if (!correct) break;
     }
 
-    // Calculate score
-    let score = 0;
-    if (correct) {
-      const baseScores = {
-        'Easy': 100,
-        'Medium': 200,
-        'Hard': 300,
-        'Expert': 500,
-      };
-      const baseScore = baseScores[puzzleData.difficulty as keyof typeof baseScores] || 100;
-      const timeBonus = Math.max(0, (600 - timeSpent) / 6);
-      score = Math.round(baseScore + timeBonus);
-    }
+    // Calculate score: time-based (lower is better)
+    // Score equals time spent in seconds if solved correctly
+    // Invalid moves add 30-second penalties to the timer, which increases the score
+    let score = correct ? timeSpent : 0;
 
     // Store game record
     const gameId = `${sessionId}:${Date.now()}`;

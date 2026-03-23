@@ -14,14 +14,13 @@ import {
   ChevronLeft,
   Play,
   Pause,
-  Timer as TimerIcon
+  Timer as TimerIcon,
+  Zap
 } from 'lucide-react';
 import { 
   Difficulty, 
   Board
 } from './utils/sudoku';
-import InvalidMoveCounter from './components/InvalidMoveCounter';
-import LossScreen from './components/LossScreen';
 
 const DIFFICULTIES: Difficulty[] = ['Easy', 'Medium', 'Hard', 'Expert'];
 
@@ -84,7 +83,7 @@ export default function App() {
   const [currentBoard, setCurrentBoard] = useState<Board>([]);
   const [selectedCell, setSelectedCell] = useState<[number, number] | null>(null);
   const [difficulty, setDifficulty] = useState<Difficulty>('Easy');
-  const [gameState, setGameState] = useState<'menu' | 'playing' | 'won' | 'lost'>('menu');
+  const [gameState, setGameState] = useState<'menu' | 'playing' | 'won'>('menu');
   const [timer, setTimer] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [mistakes, setMistakes] = useState(0);
@@ -182,15 +181,12 @@ export default function App() {
       const validationResult = await validateMove(row, col, num);
       
       if (!validationResult.valid) {
-        // Invalid move - increment counter
+        // Invalid move - add 30-second penalty and continue game
         const newInvalidCount = invalidMoveCount + 1;
         setInvalidMoveCount(newInvalidCount);
-        setErrorMessage(`Invalid move! Number already exists in this row, column, or box. (${newInvalidCount}/3 strikes)`);
+        setTimer(prev => prev + 30);
+        setErrorMessage('Invalid move! +30 seconds penalty. Keep trying!');
         setTimeout(() => setErrorMessage(null), 3000);
-        
-        if (newInvalidCount >= 3) {
-          setGameState('lost');
-        }
         return;
       }
 
@@ -219,12 +215,9 @@ export default function App() {
         // Valid structure but wrong number
         const newInvalidCount = invalidMoveCount + 1;
         setInvalidMoveCount(newInvalidCount);
-        setErrorMessage(`Incorrect number! Try again. (${newInvalidCount}/3 strikes)`);
+        setTimer(prev => prev + 30);
+        setErrorMessage('Incorrect number! +30 seconds penalty. Try again!');
         setTimeout(() => setErrorMessage(null), 3000);
-        
-        if (newInvalidCount >= 3) {
-          setGameState('lost');
-        }
       }
     } catch (error) {
       console.error('Validation error:', error);
@@ -360,12 +353,6 @@ export default function App() {
                 </motion.div>
               )}
             </motion.div>
-          ) : gameState === 'lost' ? (
-            <LossScreen 
-              difficulty={difficulty}
-              onRestart={() => startNewGame(difficulty)}
-              onHome={() => setGameState('menu')}
-            />
           ) : gameState === 'playing' ? (
             <motion.div 
               key="playing"
@@ -376,7 +363,12 @@ export default function App() {
               {/* Stats Bar */}
               <div className="flex justify-between items-center text-sm font-medium text-gray-500">
                 <div className="flex items-center gap-4">
-                  <InvalidMoveCounter count={invalidMoveCount} maxCount={3} />
+                  {invalidMoveCount > 0 && (
+                    <div className="flex items-center gap-1 text-orange-600">
+                      <Zap size={16} />
+                      <span>{invalidMoveCount} penalt{invalidMoveCount === 1 ? 'y' : 'ies'}</span>
+                    </div>
+                  )}
                   <span>Hints: {hints}</span>
                 </div>
                 <button 
@@ -503,8 +495,13 @@ export default function App() {
               </div>
               <h2 className="text-4xl font-bold">Magnificent!</h2>
               <p className="text-gray-500 max-w-xs mx-auto">
-                You've mastered the {difficulty} level in {formatTime(timer)}. Your focus is truly impressive.
+                You solved it in <span className="font-bold text-indigo-600">{formatTime(timer)}</span>!
               </p>
+              {invalidMoveCount > 0 && (
+                <p className="text-sm text-gray-400">
+                  {invalidMoveCount} penalt{invalidMoveCount === 1 ? 'y' : 'ies'} applied • Final time: {formatTime(timer)}
+                </p>
+              )}
               <div className="flex flex-col gap-3 max-w-xs mx-auto pt-6">
                 <button 
                   onClick={() => startNewGame(difficulty)}
